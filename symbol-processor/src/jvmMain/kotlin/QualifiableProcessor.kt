@@ -9,6 +9,11 @@ import my.annotations.Qualifiable
 import java.io.OutputStreamWriter
 
 
+const val GENERATED_PACKAGE_NAME = "my.generated"
+const val GENERATED_FILE_NAME = "Qualifiables"
+const val GENERATED_EXTENSION_NAME = "kt"
+
+
 class QualifiableProcessor(environment: SymbolProcessorEnvironment) : SymbolProcessor {
 
     private val codeGenerator = environment.codeGenerator
@@ -16,23 +21,27 @@ class QualifiableProcessor(environment: SymbolProcessorEnvironment) : SymbolProc
     private var isInitialInvocation = true
 
     override fun process(resolver: Resolver): List<KSAnnotated> {
-        val fileNames = resolver.getAllFiles().map { it.fileName }.toList()
-        logger.warn("${javaClass.simpleName}: isInitialInvocation=$isInitialInvocation, processing $fileNames")
+        val newFiles = resolver.getNewFiles()
+        logger.warn(
+            "${javaClass.simpleName}: isInitialInvocation=$isInitialInvocation," +
+                    " new: ${newFiles.map { it.fileName }.toList()}"
+        )
 
-        if (!isInitialInvocation) {
-            // A subsequent invocation is for processing generated files. We do not need to process these.
+        if (!isInitialInvocation || newFiles.firstOrNull() == null) {
+            // * A subsequent invocation is for processing generated files. We do not need to process these.
+            // * If there are no new files to process, we avoid generating an output file, as this would break
+            //   incremental compilation.
+            //   TODO: This could be omitted if file generation were not required to discover the output source set.
             return emptyList()
         }
 
         isInitialInvocation = false
 
         codeGenerator.createNewFile(
-            // TODO: How to support incremental compilation with dedicated dependencies if an annotation can be
-            //       added to any source file, not just the ones previously processed?
-            dependencies = Dependencies.ALL_FILES,
-            packageName = "my.generated",
-            fileName = "Qualifiables",
-            extensionName = "kt"
+            dependencies = Dependencies(aggregating = true),
+            packageName = GENERATED_PACKAGE_NAME,
+            fileName = GENERATED_FILE_NAME,
+            extensionName = GENERATED_EXTENSION_NAME
         ).use { output ->
             // TODO: This hack to discover the output source set should be replaced with a better solution.
             val outputSourceSet = codeGenerator.generatedFile.first().toString().sourceSetBelow("ksp")
@@ -47,6 +56,8 @@ class QualifiableProcessor(environment: SymbolProcessorEnvironment) : SymbolProc
                         "package my.generated",
                     ).joinToString("\n", postfix = "\n")
                 )
+
+                val sourceClassDeclarations = mutableListOf<KSClassDeclaration>()
 
                 resolver
                     .getSymbolsWithAnnotation(Qualifiable::class.qualifiedName!!)
@@ -65,8 +76,18 @@ class QualifiableProcessor(environment: SymbolProcessorEnvironment) : SymbolProc
                         if (inputSourceSet == outputSourceSet) {
                             val qualifiedClassName = classDeclaration.qualifiedName()
                             writer.write("val $qualifiedClassName.qualifiedClassName get() = \"$qualifiedClassName\"\n")
+                            sourceClassDeclarations.add(classDeclaration)
                         }
                     }
+
+                if (sourceClassDeclarations.isNotEmpty()) {
+                    codeGenerator.associateWithClasses(
+                        classes = sourceClassDeclarations,
+                        packageName = GENERATED_PACKAGE_NAME,
+                        fileName = GENERATED_FILE_NAME,
+                        extensionName = GENERATED_EXTENSION_NAME
+                    )
+                }
             }
         }
 
