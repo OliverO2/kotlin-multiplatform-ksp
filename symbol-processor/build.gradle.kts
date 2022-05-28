@@ -2,18 +2,12 @@ plugins {
     kotlin("multiplatform")
 }
 
-repositories {
-    mavenCentral()
+java {
+    toolchain.languageVersion.set(JavaLanguageVersion.of(11))
 }
 
 kotlin {
-    jvm {
-        compilations.all {
-            kotlinOptions {
-                jvmTarget = "11"
-            }
-        }
-    }
+    jvm()
 
     sourceSets {
         val jvmMain by getting {

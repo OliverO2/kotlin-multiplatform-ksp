@@ -5,19 +5,12 @@ plugins {
     id("com.google.devtools.ksp")
 }
 
-repositories {
-    mavenCentral()
+java {
+    toolchain.languageVersion.set(JavaLanguageVersion.of(11))
 }
 
 kotlin {
-    jvm {
-        compilations.all {
-            kotlinOptions {
-                jvmTarget = "11"
-            }
-        }
-        withJava()
-    }
+    jvm()
 
     js(IR) {
         nodejs()
