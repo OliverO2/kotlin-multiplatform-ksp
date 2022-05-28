@@ -49,7 +49,7 @@ dependencies {
     // Provide symbol processing for each Kotlin '*Main' source set.
     kotlin.sourceSets.forEach {
         val kspConfiguration = when {
-            it.name == "commonMain" -> "kspMetadata"
+            it.name == "commonMain" -> "kspCommonMainMetadata"
             it.name.endsWith("Main") -> "ksp${it.name.substringBefore("Main").capitalize()}"
             else -> null
         }
@@ -61,10 +61,10 @@ dependencies {
 // Fix KSP task dependencies (https://github.com/google/ksp/issues/963)
 afterEvaluate {  // WORKAROUND: both register() and named() fail – https://github.com/gradle/gradle/issues/9331
     tasks {
-        val kspKotlinMetadata by getting
+        val kspCommonMainKotlinMetadata by getting
         withType<org.jetbrains.kotlin.gradle.dsl.KotlinCompile<*>> {
-            if (this !== kspKotlinMetadata)
-                dependsOn(kspKotlinMetadata)
+            if (this !== kspCommonMainKotlinMetadata)
+                dependsOn(kspCommonMainKotlinMetadata)
         }
     }
 }
